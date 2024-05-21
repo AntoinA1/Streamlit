@@ -17,6 +17,7 @@ import random as rd
 # Chargement des données
 movies_df = load_items()
 ratings_data = load_ratings(surprise_format=True)
+trainset = ratings_data.build_full_trainset()
 
 # Créer un dictionnaire qui mappe les IDs des films aux titres correspondants
 movie_id_to_title = dict(zip(movies_df.index, movies_df['title']))
@@ -48,26 +49,10 @@ class UserBasedRecommender:
 
     def get_user_recommendations(self, user_id, n=10):
         return self.recommend_items(user_id, n)
-
-# Classe pour Content-Based Recommender (à implémenter)
-class ContentBasedRecommender:
-    def __init__(self):
-        pass
-
-    def fit(self, data):
-        # Implémentez ici votre logique pour entraîner le modèle basé sur le contenu
-        pass
-
-    def recommend_items(self, user_id, n=5):
-        # Implémentez ici votre logique pour recommander des éléments
-        pass
-
-    def get_user_recommendations(self, user_id, n=10):
-        return self.recommend_items(user_id, n)
     
-class ContentBased(AlgoBase):
-    def __init__(self, features_method, regressor_method):
-        AlgoBase.__init__(self)
+class ContentBased():
+    def __init__(self, trainset, features_method, regressor_method):
+        self.trainset = trainset
         self.regressor_method = regressor_method
         self.content_features = self.create_content_features(features_method)
 
@@ -88,7 +73,6 @@ class ContentBased(AlgoBase):
         return df_features
 
     def fit(self, trainset):
-        AlgoBase.fit(self, trainset)
         
         self.user_profile = {u: None for u in trainset.all_users()}
 
@@ -193,7 +177,7 @@ rec_type = st.selectbox("Type de recommandation", ["User-Based", "Content-Based"
 if rec_type == "User-Based":
     recommender = UserBasedRecommender(sim_options={'name': 'cosine', 'user_based': True, 'min_support': 3}, k=3, min_k=4)
 elif rec_type == "Content-Based":
-    recommender = ContentBasedRecommender()
+    recommender = ContentBased(trainset=trainset, features_method= "genres", regressor_method= "ridge_regression" )
 
 # Entraîner le modèle avec les données initiales
 recommender.fit(ratings_data)
