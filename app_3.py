@@ -8,6 +8,8 @@ from collections import defaultdict
 # Chargement des données
 movies_df = load_items()
 ratings_data = load_ratings(surprise_format=True)
+# Créer un dictionnaire qui mappe les IDs des films aux titres correspondants
+movie_id_to_title = dict(zip(movies_df.index, movies_df['title']))
 
 # Classe Recommender
 class UserBasedRecommender:
@@ -37,6 +39,12 @@ class UserBasedRecommender:
     def get_user_recommendations(self, user_id, n=10):
         return self.recommend_items(user_id, n)
 
+
+# Utiliser le dictionnaire pour obtenir le titre du film par son ID
+def get_movie_title_by_id(movie_id, movie_id_to_title):
+    """Obtenir le titre du film par son ID"""
+    return movie_id_to_title.get(movie_id, "Titre non trouvé")
+
 # Titre de l'application
 st.title("Recommender System, Group 6")
 
@@ -45,18 +53,18 @@ recommender = UserBasedRecommender(sim_options={'name': 'cosine', 'user_based': 
 recommender.fit(ratings_data)
 
 # Section pour l'insertion de l'ID utilisateur
-user_id = int(st.number_input("Enter User ID:"))
+user_id = int(st.number_input("Enter User ID:", min_value=1, step=1))
 
 # Obtenir les recommandations personnalisées pour l'utilisateur
 if user_id:
     # Obtention des recommandations pour cet utilisateur
     recommendations = recommender.get_user_recommendations(user_id)
     
-    # Affichage des recommandations
+    # Affichage des recommandations avec les titres des films
     if recommendations:
         st.header("Recommandations personnalisées")
         for movie_id, rating in recommendations:
-            
-            st.write(f"Film recommandé : {movie_id}, Estimation : {rating}")
+            movie_title = get_movie_title_by_id(movie_id, movie_id_to_title)
+            st.write(f"Film recommandé : {movie_title})
     else:
         st.warning("Aucune recommandation trouvée pour cet utilisateur.")
