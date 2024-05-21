@@ -1,38 +1,39 @@
 # third parties imports
 import pandas as pd
-
-# local imports
-from constants import Constant as C
+import os
+from datetime import datetime
 from surprise import Reader
 from surprise import Dataset
 
-'''def load_ratings(surprise_format=False):
-    df_ratings = pd.read_csv(C.EVIDENCE_PATH / C.RATINGS_FILENAME)
-    if surprise_format:
-        pass
-    else:
-        return df_ratings'''
+# local imports
+from constants import Constant as C
 
-def load_ratings(surprise_format=False):
+def load_ratings(surprise_format=True):
+    """Load ratings from a CSV file into a Pandas DataFrame or a Surprise Dataset."""
     df_ratings = pd.read_csv(C.EVIDENCE_PATH / C.RATINGS_FILENAME)
-    
     if surprise_format:
-        # Convertir le DataFrame en Dataset surprise
-        reader = Reader(rating_scale=C.RATINGS_SCALE)
-        surprise_dataset = Dataset.load_from_df(df_ratings, (reader))
-        return surprise_dataset
+        # Convert the DataFrame to a Surprise Dataset
+        reader = Reader(rating_scale=C.RATINGS_SCALE)  # Utiliser l'échelle de notation définie
+        surprise_dataset = Dataset.load_from_df(df_ratings[[C.USER_ID_COL, C.ITEM_ID_COL, C.RATING_COL]], reader)
+        return surprise_dataset  
     else:
         return df_ratings
 
+
+
 def load_items():
-    df_items = pd.read_csv(C.CONTENT_PATH / C.ITEMS_FILENAME)
+    df_items = pd.read_csv(C.CONTENT_PATH / C.ITEMS_FILENAME, dtype={C.ITEM_ID_COL: int})
     df_items = df_items.set_index(C.ITEM_ID_COL)
     return df_items
 
 
 def export_evaluation_report(df):
     """ Export the report to the evaluation folder.
-
-    The name of the report is versioned using today's date
+    The name of the report is versioned using today's date.
+    Parameters:
+    df (DataFrame): The evaluation report DataFrame to export.
     """
-    pass
+    today = datetime.today().strftime("%Y_%m_%d")
+    filename = f"evaluation_report_{today}.csv"
+    filepath = os.path.join(C.EVALUATION_PATH, filename)
+    df.to_csv(filepath, index=False)
