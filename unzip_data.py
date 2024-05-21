@@ -20,4 +20,4 @@ def unzip_and_remove(zip_filename):
 
 
 if __name__ == "__main__":
-    unzip_and_remove("mlsmm2156/data.zip")
+    unzip_and_remove("mlsmm2156/posters.zip")

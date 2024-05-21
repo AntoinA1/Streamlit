@@ -1,0 +1,31 @@
+import zipfile
+import os
+
+# Chemin vers le fichier ZIP à extraire
+zip_file_path = "data/posters.zip"
+
+# Dossier de destination pour les fichiers extraits
+extracted_folder = "data/posters"
+
+# Créer le dossier de destination s'il n'existe pas
+os.makedirs(extracted_folder, exist_ok=True)
+
+# Nombre de fichiers à extraire par lot
+batch_size = 10000
+
+# Fonction pour extraire les fichiers par lot
+def extract_files(zip_file, batch_size, extracted_folder):
+    with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+        file_list = zip_ref.namelist()
+        num_files = len(file_list)
+        num_batches = (num_files + batch_size - 1) // batch_size
+        
+        for i in range(num_batches):
+            start_index = i * batch_size
+            end_index = min((i + 1) * batch_size, num_files)
+            batch_files = file_list[start_index:end_index]
+            zip_ref.extractall(extracted_folder, members=batch_files)
+            print(f"Batch {i+1}/{num_batches} extracted.")
+
+# Appeler la fonction pour extraire les fichiers par lot
+extract_files(zip_file_path, batch_size, extracted_folder)

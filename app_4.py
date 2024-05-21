@@ -6,10 +6,13 @@ from surprise.prediction_algorithms.knns import KNNWithMeans
 from surprise import Dataset, Reader
 from collections import defaultdict
 import pandas as pd
+import os
+import glob
 
 # Chargement des données
 movies_df = load_items()
 ratings_data = load_ratings(surprise_format=True)
+
 # Créer un dictionnaire qui mappe les IDs des films aux titres correspondants
 movie_id_to_title = dict(zip(movies_df.index, movies_df['title']))
 
@@ -43,7 +46,6 @@ class UserBasedRecommender:
 
 # Utiliser le dictionnaire pour obtenir le titre du film par son ID
 def get_movie_title_by_id(movie_id, movie_id_to_title):
-    """Obtenir le titre du film par son ID"""
     return movie_id_to_title.get(movie_id, "Titre non trouvé")
 
 # Initialiser l'état de la session pour stocker les nouvelles notations
@@ -71,47 +73,32 @@ if movie_query:
 # Afficher les films et les notes ajoutés
 if st.session_state['new_ratings']:
     st.header("Films notés")
-    # Afficher les notations ajoutées avec un bouton "poubelle" pour chaque notation
     for i, (movie_id, rating) in enumerate(st.session_state['new_ratings']):
-        # Afficher le titre du film et la note
         st.write(f"Film : {get_movie_title_by_id(movie_id, movie_id_to_title)}, Note : {rating}")
-        
-        # Bouton "poubelle" pour supprimer la notation
-        if st.button(f"Supprimer la notation {i+1}"):
-            # Supprimer la notation de la liste new_ratings dans la variable de session
+        if st.button(f"Supprimer la notation {i+1}", key=f"del_{i}"):
             del st.session_state['new_ratings'][i]
-            # Afficher un message de confirmation
             st.success("Notation supprimée avec succès !")
-            # Actualiser l'interface utilisateur
             st.experimental_rerun()
 
 # Création de l'instance du Recommender
-recommender = UserBasedRecommender(sim_options={'name': 'cosine', 'user_based': True, 'min_support': 3}, k=3, min_k=2)
+recommender = UserBasedRecommender(sim_options={'name': 'cosine', 'user_based': True, 'min_support': 3}, k=3, min_k=4)
 recommender.fit(ratings_data)
 
 # Bouton pour générer les recommandations
 if st.button("Obtenir des recommandations"):
-    # Ajouter les nouvelles notes aux données existantes
     if st.session_state['new_ratings']:
-        # Créer un DataFrame des nouvelles notes
         new_ratings_df = pd.DataFrame(st.session_state['new_ratings'], columns=['movieId', 'rating'])
-        new_ratings_df['userId'] = ratings_data.df['userId'].max() + 1  # Assigner un nouvel ID utilisateur
+        new_ratings_df['userId'] = ratings_data.df['userId'].max() + 1
 
-        # Fusionner avec les données existantes
         combined_ratings = pd.concat([ratings_data.df, new_ratings_df], ignore_index=True)
-
-        # Recharger les données dans le format Surprise
         reader = Reader(rating_scale=(0.5, 5.0))
         combined_data = Dataset.load_from_df(combined_ratings[['userId', 'movieId', 'rating']], reader)
-        
-        # Réentrainer le modèle avec les nouvelles données
+
         recommender.fit(combined_data)
 
-        # Obtenir les recommandations pour le nouvel utilisateur
         user_id = new_ratings_df['userId'].iloc[0]
         recommendations = recommender.get_user_recommendations(user_id)
 
-        # Affichage des recommandations avec les titres des films
         if recommendations:
             st.header("Recommandations personnalisées")
             for movie_id, rating in recommendations:

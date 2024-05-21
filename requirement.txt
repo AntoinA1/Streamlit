@@ -1,0 +1,7 @@
+streamlit
+fuzzywuzzy
+python-Levenshtein
+pandas
+surprise
+glob2
+
