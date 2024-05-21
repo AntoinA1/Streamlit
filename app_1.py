@@ -1,13 +1,7 @@
 
 import streamlit as st
 import pandas as pd
-from fuzzywuzzy import process
 
-
-# Fonction pour trouver les films avec tolérance aux fautes d'orthographe
-def search_movie(query, choices, limit=5):
-    results = process.extract(query, choices, limit=limit)
-    return [result[0] for result in results]
 
 # Titre de l'application
 st.title("Recommender System, Group 6")
