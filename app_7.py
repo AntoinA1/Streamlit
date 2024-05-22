@@ -25,11 +25,16 @@ trainset = ratings_data.build_full_trainset()
 movie_id_to_title = dict(zip(movies_df.index, movies_df['title']))
 
 # Fonction pour la barre latérale
-def sidebar():
-    st.sidebar.title("Filtres")
-    selected_genres = st.sidebar.multiselect("Sélectionnez les genres", movies_df['genres'].unique())
-
-    return selected_genres
+def sidebar(rec_type):
+    st.sidebar.title('Options')
+    if rec_type == "User-Based":
+        txt = st.sidebar.write("Options coming soon...")
+        return txt
+    elif rec_type == "Content-Based":
+        # Sélection des genres
+        unique_genres = set('|'.join(movies_df['genres']).split('|'))  # Obtenir les genres uniques
+        selected_genres = st.sidebar.multiselect("Wished Genres", list(unique_genres))
+        return selected_genres
 
 # Classe Recommender pour User-Based
 class UserBasedRecommender:
@@ -80,7 +85,7 @@ class ContentBased:
         else:
             return None
     
-    def recommend_movies(self, movie_query):
+    def recommend_movies(self, movie_query, selected_genres):
         # Recherche des films correspondant à la requête de l'utilisateur
         movie_choices = self.movies_df['title'].tolist()
         search_results = process.extract(movie_query, movie_choices, limit=5)
@@ -97,8 +102,16 @@ class ContentBased:
             # Calculer le nombre de genres du film sélectionné
             num_genres_selected_movie = self.genres_df.loc[selected_movie_id].sum()
 
-            # Trouver les films similaires à celui que l'utilisateur a aimé
-            similar_movies = pd.Series(self.film_similarity[selected_movie_id], index=self.movies_df.index).sort_values(ascending=False)[1:]
+           # Si aucun genre n'est sélectionné, utilisez tous les genres disponibles
+            if not selected_genres:
+                similar_movies = pd.Series(self.film_similarity[selected_movie_id], index=self.movies_df.index).sort_values(ascending=False)[1:]
+            else:
+                # Filtrer les recommandations par les genres sélectionnés par l'utilisateur
+                similar_movies = pd.Series(self.film_similarity[selected_movie_id], index=self.movies_df.index).sort_values(ascending=False)[1:]
+                similar_movies = similar_movies[self.movies_df['genres'].apply(lambda x: any(genre in selected_genres for genre in x.split('|')))]
+
+            # Filtrer les recommandations pour exclure le film entré par l'utilisateur
+            similar_movies = similar_movies[similar_movies.index != selected_movie_id]
 
             # Créer une liste de tuples (ID de film, score de similarité, année de publication) pour les films similaires
             movie_scores = []
@@ -111,7 +124,7 @@ class ContentBased:
             movie_scores.sort(key=lambda x: x[1], reverse=True)
 
             # Afficher le titre du film demandé
-            st.write(f"Voici les films les plus similaires à '{selected_movie}' :")
+            st.write(f"Similar movies to'{selected_movie}' are :")
 
             # Afficher les films recommandés à l'utilisateur
             num_recommendations = 0
@@ -127,11 +140,6 @@ class ContentBased:
         else:
             st.error("Veuillez sélectionner un film.")
 
-
-
-
-    
-
 # Utiliser le dictionnaire pour obtenir le titre du film par son ID
 def get_movie_title_by_id(movie_id, movie_id_to_title):
     return movie_id_to_title.get(movie_id, "Titre non trouvé")
@@ -143,34 +151,55 @@ if 'new_ratings' not in st.session_state:
 # Titre de l'application
 st.title("Recommender System, Group 6")
 
+explication = """
+    \nWelcome to our movie recommendation application:
+
+    \n- User-based is ...
+    \n- Content-based is ...
+    \n- Feel free to try some options available on the sidebar :)
+    """
+if st.button("Rec Sys Explanation", key= "Explanation button"):
+    st.write(explication)
+
 # Section pour choisir le type de système de recommandation
-st.header("Choisissez le type de système de recommandation")
-rec_type = st.selectbox("Type de recommandation", ["User-Based", "Content-Based"])
+st.header("Choose one Recommender System")
+rec_type = st.radio("", ["User-Based", "Content-Based"])
 
 # Si User-Based est sélectionné
 if rec_type == "User-Based":
+    # Affichage de la sidebar pour les options
+    options = sidebar("User-Based")
+
     # Section pour l'insertion des films et des notes pour un nouvel utilisateur
-    st.header("Nouvel utilisateur - Entrez vos films et notes")
-    movie_query = st.text_input("Entrez le nom d'un film que vous avez vu")
+    st.header("New User - Create a profile")
+
+    # Entrée du nom du film
+    movie_query = st.text_input("Enter film name")
+
+    # Proposer une liste de films ressemblant à l'orthographe dès que l'utilisateur commence à saisir le nom du film
     if movie_query:
         movie_choices = movies_df['title'].tolist()
         search_results = process.extract(movie_query, movie_choices, limit=5)
-        selected_movie = st.selectbox("Sélectionnez un film :", [result[0] for result in search_results])
-        if selected_movie:
-            rating = st.slider(f"Notez le film {selected_movie}", 0.5, 5.0, 3.0, step=0.5)
-            if st.button("Ajouter ce film et sa note"):
-                movie_id = movies_df[movies_df['title'] == selected_movie].index[0]
-                st.session_state['new_ratings'].append((movie_id, rating))
-                st.success(f"Ajouté: {selected_movie} - {rating}")
+        selected_movie = st.selectbox("Select a film :", [result[0] for result in search_results])
+
+    # Sélection de la note
+    if selected_movie:
+        rating = st.slider("Select a rating", 0.5, 5.0, 3.0, step=0.5)
+
+        # Bouton pour ajouter le film et sa note
+        if st.button("Add film and rating"):
+            movie_id = movies_df[movies_df['title'] == selected_movie].index[0]
+            st.session_state['new_ratings'].append((movie_id, rating))
+            st.success(f"Added: {selected_movie} - {rating}")
 
     # Afficher les films et les notes ajoutés
     if st.session_state['new_ratings']:
-        st.header("Films notés")
+        st.header("Rated films")
         for i, (movie_id, rating) in enumerate(st.session_state['new_ratings']):
-            st.write(f"Film : {get_movie_title_by_id(movie_id, movie_id_to_title)}, Note : {rating}")
-            if st.button(f"Supprimer la notation {i+1}", key=f"del_{i}"):
+            st.write(f"Film : {get_movie_title_by_id(movie_id, movie_id_to_title)}, Rating : {rating}")
+            if st.button(f"Delete rating {i+1}", key=f"del_{i}"):
                 del st.session_state['new_ratings'][i]
-                st.success("Notation supprimée avec succès !")
+                st.success("Rating deleted !")
                 st.experimental_rerun()
 
     # Création de l'instance du Recommender en fonction du choix
@@ -179,8 +208,9 @@ if rec_type == "User-Based":
     # Entraîner le modèle avec les données initiales
     recommender.fit(ratings_data)
 
+
     # Bouton pour générer les recommandations
-    if st.button("Obtenir des recommandations"):
+    if st.button("Get recommendations"):
         if st.session_state['new_ratings']:
             new_ratings_df = pd.DataFrame(st.session_state['new_ratings'], columns=['movieId', 'rating'])
             new_ratings_df['userId'] = ratings_data.df['userId'].max() + 1
@@ -195,20 +225,23 @@ if rec_type == "User-Based":
             recommendations = recommender.get_user_recommendations(user_id)
 
             if recommendations:
-                st.header("Recommandations personnalisées")
+                st.header("Personalized recommendations")
                 for movie_id, rating in recommendations:
                     movie_title = get_movie_title_by_id(movie_id, movie_id_to_title)
-                    st.write(f"Film recommandé : {movie_title}, Estimation : {rating}")
+                    st.write(f"Recommended film : {movie_title}, Estimation : {rating}")
             else:
-                st.warning("Aucune recommandation trouvée pour cet utilisateur.")
+                st.warning("No recommendation for this user.")
+
 
 # Si Content-Based est sélectionné
 elif rec_type == "Content-Based":
+    # Appeler la fonction sidebar pour obtenir les filtres de genre
+    selected_genres = sidebar("Content-Based")
     # Section pour entrer l'ID du film que l'utilisateur a aimé
-    st.header("Quel film avez-vous aimé? :")
-    selected_movie_id = st.text_input("Entrez le nom du film que vous avez aimé :")
+    st.header("Which film did you like? :")
+    selected_movie_id = st.text_input("Enter film:")
     recommender = ContentBased()
 
     # Afficher les recommandations
-    if st.button("Obtenir des recommandations"):
-        recommender.recommend_movies(selected_movie_id)
+    if st.button("Get recommendations"):
+        recommender.recommend_movies(movie_query= selected_movie_id, selected_genres=selected_genres)
