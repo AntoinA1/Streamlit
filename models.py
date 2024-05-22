@@ -123,50 +123,49 @@ class ContentBased(AlgoBase):
         elif self.regressor_method == 'random_sample':
             for u in self.user_profile:
                 self.user_profile[u] = [rating for _, rating in self.trainset.ur[u]]
-        
-        elif self.regressor_method == 'linear_regression':
+
+        elif self.regressor_method in ['linear_regression', 'ridge_regression']:
             for u in trainset.all_users():
                 user_ratings = [rating for (_, rating) in trainset.ur[u]]
                 item_ids = [trainset.to_raw_iid(iid) for (iid, _) in trainset.ur[u]]
                 df_user = pd.DataFrame({'item_id': item_ids, 'user_ratings': user_ratings})
+                
+                # Map inner item ids to raw item ids
                 df_user['item_id'] = df_user['item_id'].map(trainset.to_raw_iid)
+                
+                # Merge user ratings with content features
                 df_user = df_user.merge(
                     self.content_features,
                     how='left',
                     left_on='item_id',
                     right_index=True
-                ).dropna()
-                lr = LinearRegression(fit_intercept=False)
-                X = df_user[['n_character_title', 'release_year']].values
+                ).dropna()  # Ensure no NaN values
+
+                if df_user.empty:
+                    print(f"User {u} has no valid data after merging with content features.")
+                    continue
+
+                if self.regressor_method == 'ridge_regression':
+                    model = Ridge(fit_intercept=False)
+                else:
+                    model = LinearRegression(fit_intercept=False)
+                
+                X = df_user[['n_character_title', 'release_year']].values  # Extract features
                 y = df_user['user_ratings'].values
-                lr.fit(X, y)
-                self.user_profile[u] = lr
-        
-        elif self.regressor_method == 'ridge_regression':
-            for u in trainset.all_users():
-                user_ratings = [rating for (_, rating) in trainset.ur[u]]
-                item_ids = [trainset.to_raw_iid(iid) for (iid, _) in trainset.ur[u]]
-                df_user = pd.DataFrame({'item_id': item_ids, 'user_ratings': user_ratings})
-                df_user['item_id'] = df_user['item_id'].map(trainset.to_raw_iid)
-                df_user = df_user.merge(
-                    self.content_features,
-                    how='left',
-                    left_on='item_id',
-                    right_index=True
-                ).dropna()
-                ridge = Ridge(alpha=1.0, fit_intercept=False)
-                X = df_user[['n_character_title', 'release_year']].values
-                y = df_user['user_ratings'].values
-                ridge.fit(X, y)
-                self.user_profile[u] = ridge
+                
+                model.fit(X, y)
+                
+                # Assign regressor to user profile
+                self.user_profile[u] = model
         
         else:
             pass
+
     
     def estimate(self, u, i):
         """Scoring component used for item filtering"""
         if not (self.trainset.knows_user(u) and self.trainset.knows_item(i)):
-            raise PredictionImpossible('User and/or item is unkown.')
+            raise PredictionImpossible('User and/or item is unknown.')
 
         if self.regressor_method == 'random_score':
             rd.seed()
@@ -178,15 +177,20 @@ class ContentBased(AlgoBase):
 
         elif self.regressor_method in ['linear_regression', 'ridge_regression']:
             raw_item_id = self.trainset.to_raw_iid(i)
-            item_features = self.content_features.loc[raw_item_id:raw_item_id, :].values.reshape(1, -1)
+            if raw_item_id not in self.content_features.index:
+                raise PredictionImpossible('Item is unknown.')
+
+            item_features = self.content_features.loc[raw_item_id].values.reshape(1, -1)
             regressor = self.user_profile[u]
             if regressor is None: 
                 raise PredictionImpossible('User profile is not trained.')
-            score = regressor.predict(item_features.reshape(1, -1))[0]  # Récupérer le scalaire à partir du tableau numpy
-            # Clipper le score pour s'assurer qu'il est compris entre 0.5 et 5
+
+            score = regressor.predict(item_features)[0]
+            # Ensure score is a float and clip to the rating range
+            score = float(score)
             score = max(0.5, min(score, 5))
 
         else:
-            score = None
+            raise PredictionImpossible('Unknown regressor method.')
 
         return score
