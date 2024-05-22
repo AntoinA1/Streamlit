@@ -4,8 +4,7 @@ from surprise import accuracy
 
 class EvalConfig:
    
-    models = [("UserBasedRecommender",  UserBasedRecommender, {}),
-    ("UserBasedKnnwithmeans", UserBasedKnnwithmeans, {})]
+    models = [("ContentBased", ContentBased, {'features_method': None, "regressor_method": 'random_sample'} )]
     split_metrics = ["mae", "rmse"]
     loo_metrics = ["hit_rate"]  # Add "hit rate"
     full_metrics = ["novelty"]  # Add "novelty" 
