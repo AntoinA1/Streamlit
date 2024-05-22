@@ -135,7 +135,7 @@ class ContentBased(AlgoBase):
                     how='left',
                     left_on='item_id',
                     right_index=True
-                )
+                ).dropna()
                 lr = LinearRegression(fit_intercept=False)
                 X = df_user[['n_character_title', 'release_year']].values
                 y = df_user['user_ratings'].values
@@ -153,7 +153,7 @@ class ContentBased(AlgoBase):
                     how='left',
                     left_on='item_id',
                     right_index=True
-                )
+                ).dropna()
                 ridge = Ridge(alpha=1.0, fit_intercept=False)
                 X = df_user[['n_character_title', 'release_year']].values
                 y = df_user['user_ratings'].values
@@ -178,9 +178,13 @@ class ContentBased(AlgoBase):
 
         elif self.regressor_method in ['linear_regression', 'ridge_regression']:
             raw_item_id = self.trainset.to_raw_iid(i)
-            item_features = self.content_features.loc[raw_item_id].values.reshape(1, -1)
+            item_features = self.content_features.loc[raw_item_id:raw_item_id, :].values.reshape(1, -1)
             regressor = self.user_profile[u]
-            score = regressor.predict(item_features)[0]
+            if regressor is None: 
+                raise PredictionImpossible('User profile is not trained.')
+            score = regressor.predict(item_features.reshape(1, -1))[0]  # Récupérer le scalaire à partir du tableau numpy
+            # Clipper le score pour s'assurer qu'il est compris entre 0.5 et 5
+            score = max(0.5, min(score, 5))
 
         else:
             score = None
