@@ -12,6 +12,7 @@ from surprise import AlgoBase, PredictionImpossible
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.ensemble import RandomForestRegressor
 import random as rd
+import re
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -50,7 +51,8 @@ class UserBasedRecommender:
 
     def get_user_recommendations(self, user_id, n=10):
         return self.recommend_items(user_id, n)
-    
+
+
 class ContentBased:
     def __init__(self):
         # Chargement des données
@@ -63,6 +65,14 @@ class ContentBased:
         # Calcul de la similarité cosinus entre les films
         self.film_similarity = cosine_similarity(self.genres_df)
     
+    def extract_year_from_title(self, title):
+        # Utilisation d'une expression régulière pour extraire l'année du titre du film
+        match = re.search(r'\(([0-9]{4})\)$', title)
+        if match:
+            return int(match.group(1))
+        else:
+            return None
+    
     def recommend_movies(self, movie_query):
         # Recherche des films correspondant à la requête de l'utilisateur
         movie_choices = self.movies_df['title'].tolist()
@@ -74,18 +84,45 @@ class ContentBased:
             # Trouver l'ID du film sélectionné
             selected_movie_id = self.movies_df[self.movies_df['title'] == selected_movie].index[0]
 
+            # Extraire l'année de publication du film sélectionné
+            selected_movie_year = self.extract_year_from_title(selected_movie)
+
             # Calculer le nombre de genres du film sélectionné
             num_genres_selected_movie = self.genres_df.loc[selected_movie_id].sum()
 
             # Trouver les films similaires à celui que l'utilisateur a aimé
             similar_movies = pd.Series(self.film_similarity[selected_movie_id], index=self.movies_df.index).sort_values(ascending=False)[1:]
 
+            # Créer une liste de tuples (ID de film, score de similarité, année de publication) pour les films similaires
+            movie_scores = []
+            for movie_id, similarity_score in similar_movies.items():
+                movie_title = self.movies_df.loc[movie_id, 'title']
+                movie_year = self.extract_year_from_title(movie_title)
+                if movie_year is not None:  # Vérifier si l'année de publication peut être extraite
+                    movie_scores.append((movie_id, similarity_score, movie_year))
+
+            # Trier les films similaires par score de similarité (décroissant)
+            movie_scores.sort(key=lambda x: x[1], reverse=True)
+
+            # Créer un dictionnaire pour regrouper les films ayant le même score de similarité
+            similar_score_groups = {}
+            for movie_id, similarity_score, movie_year in movie_scores:
+                if similarity_score not in similar_score_groups:
+                    similar_score_groups[similarity_score] = []
+                similar_score_groups[similarity_score].append((movie_id, similarity_score, movie_year))
+
+            # Parcourir les groupes de films ayant le même score de similarité et trier les années de publication
+            sorted_movie_scores = []
+            for similarity_score, movie_year_group in similar_score_groups.items():
+                movie_year_group.sort(key=lambda x: abs(x[2] - selected_movie_year))
+                sorted_movie_scores.extend(movie_year_group)
+
             # Afficher le titre du film demandé
             st.write(f"Voici les films les plus similaires à '{selected_movie}' :")
 
             # Afficher les films recommandés à l'utilisateur
             num_recommendations = 0
-            for i, (movie_id, similarity_score) in enumerate(similar_movies.items(), start=1):
+            for i, (movie_id, similarity_score, movie_year) in enumerate(sorted_movie_scores, start=1):
                 movie_title = self.movies_df.loc[movie_id, 'title']
 
                 # Calculer le nombre de genres du film actuellement examiné
@@ -94,12 +131,14 @@ class ContentBased:
                 # Normaliser la similarité par la racine du produit des nombres de genres des deux films
                 weighted_similarity_score = similarity_score / ((num_genres_selected_movie * num_genres_movie) ** 0.5)
 
-                st.write(f"{i}. {movie_title} (Similarité pondérée : {weighted_similarity_score:.2f})")
+                st.write(f"{i}. {movie_title} (Similarité pondérée : {weighted_similarity_score:.2f}, Année de publication : {movie_year})")
                 num_recommendations += 1
                 if num_recommendations >= 20:
                     break
         else:
             st.error("Veuillez sélectionner un film.")
+
+
     
 
 # Utiliser le dictionnaire pour obtenir le titre du film par son ID
