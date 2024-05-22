@@ -11,6 +11,8 @@ from surprise import SVD
 from loaders import load_items, load_ratings
 from surprise import PredictionImpossible
 from sklearn.linear_model import LinearRegression 
+from sklearn.linear_model import Ridge
+from constants import Constant as C
 
 
 
@@ -87,8 +89,6 @@ class ModelBaseline4(SVD):
     def __init__(self):
         SVD.__init__(self, n_factors=100)
 
-from sklearn.linear_model import LinearRegression
-
 class ContentBased(AlgoBase):
     def __init__(self, features_method, regressor_method):
         AlgoBase.__init__(self)
@@ -100,14 +100,13 @@ class ContentBased(AlgoBase):
         df_items = load_items()
         if features_method is None:
             df_features = None
-        elif features_method == "title_length": # a naive method that creates only 1 feature based on title length
+        elif features_method == "title_length":
             df_features = df_items[C.LABEL_COL].apply(lambda x: len(x)).to_frame('n_character_title')
         elif features_method == "release_year":  
-                    # Extract release year from movie title using regex
-                    pattern = r'\((\d{4})\)'  # Regex pattern to extract 4-digit numbers within parentheses
-                    df_items['release_year'] = df_items[C.LABEL_COL].str.extract(pattern)
-                    df_features = df_items['release_year'].astype(float).to_frame('release_year')
-        else: # (implement other feature creations here)
+            pattern = r'\((\d{4})\)'
+            df_items['release_year'] = df_items[C.LABEL_COL].str.extract(pattern)
+            df_features = df_items['release_year'].astype(float).to_frame('release_year')
+        else:
             raise NotImplementedError(f'Feature method {features_method} not yet implemented')
         return df_features
     
@@ -130,34 +129,42 @@ class ContentBased(AlgoBase):
                 user_ratings = [rating for (_, rating) in trainset.ur[u]]
                 item_ids = [trainset.to_raw_iid(iid) for (iid, _) in trainset.ur[u]]
                 df_user = pd.DataFrame({'item_id': item_ids, 'user_ratings': user_ratings})
-                
-                # Map inner item ids to raw item ids
                 df_user['item_id'] = df_user['item_id'].map(trainset.to_raw_iid)
-                
-                # Merge user ratings with content features
                 df_user = df_user.merge(
                     self.content_features,
                     how='left',
                     left_on='item_id',
                     right_index=True
                 )
-                
-                # Fit Linear Regression for each user
                 lr = LinearRegression(fit_intercept=False)
-                X = df_user[['n_character_title', 'release_year']].values  # Extract features
-                y = df_user['user_ratings'].values  # Extract targets
+                X = df_user[['n_character_title', 'release_year']].values
+                y = df_user['user_ratings'].values
                 lr.fit(X, y)
-                
-                # Assign linear regressor to user profile
                 self.user_profile[u] = lr
+        
+        elif self.regressor_method == 'ridge_regression':
+            for u in trainset.all_users():
+                user_ratings = [rating for (_, rating) in trainset.ur[u]]
+                item_ids = [trainset.to_raw_iid(iid) for (iid, _) in trainset.ur[u]]
+                df_user = pd.DataFrame({'item_id': item_ids, 'user_ratings': user_ratings})
+                df_user['item_id'] = df_user['item_id'].map(trainset.to_raw_iid)
+                df_user = df_user.merge(
+                    self.content_features,
+                    how='left',
+                    left_on='item_id',
+                    right_index=True
+                )
+                ridge = Ridge(alpha=1.0, fit_intercept=False)
+                X = df_user[['n_character_title', 'release_year']].values
+                y = df_user['user_ratings'].values
+                ridge.fit(X, y)
+                self.user_profile[u] = ridge
         
         else:
             pass
-            # (implement here the regressor fitting)    
     
     def estimate(self, u, i):
         """Scoring component used for item filtering"""
-        # First, handle cases for unknown users and items
         if not (self.trainset.knows_user(u) and self.trainset.knows_item(i)):
             raise PredictionImpossible('User and/or item is unkown.')
 
@@ -169,14 +176,13 @@ class ContentBased(AlgoBase):
             rd.seed()
             score = rd.choice(self.user_profile[u])
 
-        elif self.regressor_method == 'linear_regression':
+        elif self.regressor_method in ['linear_regression', 'ridge_regression']:
             raw_item_id = self.trainset.to_raw_iid(i)
-            item_features = self.content_features.loc[raw_item_id].values.reshape(1, -1)  # Retrieve item features
-            lr = self.user_profile[u]  # Retrieve linear regressor for user u
-            score = lr.predict(item_features)[0]  # Make prediction
+            item_features = self.content_features.loc[raw_item_id].values.reshape(1, -1)
+            regressor = self.user_profile[u]
+            score = regressor.predict(item_features)[0]
 
         else:
             score = None
-            # (implement here other regressor methods)
 
         return score
