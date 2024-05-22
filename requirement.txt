@@ -4,4 +4,5 @@ python-Levenshtein
 pandas
 surprise
 glob2
+scikit-learn
 

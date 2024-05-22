@@ -55,6 +55,7 @@ class ContentBased():
         self.trainset = trainset
         self.regressor_method = regressor_method
         self.content_features = self.create_content_features(features_method)
+        self.user_profiles = {}
 
     def create_content_features(self, features_method):
         df_items = load_items()
@@ -132,6 +133,8 @@ class ContentBased():
             return user_recommendations[user_id][:n]
         else:
             return []
+
+test = ContentBased.create_content_features("ContentBased", 'genres')
 
 # Utiliser le dictionnaire pour obtenir le titre du film par son ID
 def get_movie_title_by_id(movie_id, movie_id_to_title):
