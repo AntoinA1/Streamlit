@@ -81,6 +81,7 @@ class ContentBased:
 
         # Vérifier si un film a été sélectionné
         if selected_movie:
+
             # Trouver l'ID du film sélectionné
             selected_movie_id = self.movies_df[self.movies_df['title'] == selected_movie].index[0]
 

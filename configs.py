@@ -4,7 +4,7 @@ from surprise import accuracy
 
 class EvalConfig:
    
-    models = [("ContentBased", ContentBased, {'features_method': "release_year" , "regressor_method": 'ridge_regressor'} )]
+    models = [("ContentBased", ContentBased, {'features_method': "all" , "regressor_method": 'random_forest', 'alpha': 0.5} )]
     split_metrics = ["mae", "rmse"]
     loo_metrics = ["hit_rate"]  # Add "hit rate"
     full_metrics = ["novelty"]  # Add "novelty" 
