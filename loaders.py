@@ -22,8 +22,11 @@ def load_ratings(surprise_format=True):
 
 
 def load_items():
-    df_items = pd.read_csv(C.CONTENT_PATH / C.ITEMS_FILENAME, dtype={C.ITEM_ID_COL: int})
+    df_items = pd.read_csv(C.CONTENT_PATH / C.ITEMS_FILENAME)
     df_items = df_items.set_index(C.ITEM_ID_COL)
+    # Ré-indexer le DataFrame pour avoir une séquence continue de valeurs à partir de zéro
+    df_items = df_items.reset_index(drop=True)
+    
     return df_items
 
 
