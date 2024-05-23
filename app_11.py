@@ -41,8 +41,15 @@ def sidebar(rec_type):
             unsafe_allow_html=True
         )
     if rec_type == "User-Based":
-        txt = st.sidebar.write("Options coming soon...")
-        return txt
+        # Options pour le User-Based Recommender
+        st.sidebar.subheader("User-Based Options")
+        # Choix de la métrique de similarité
+        similarity_metric = st.sidebar.selectbox("Similarity Metric", ["Cosine", "Pearson", "Msd"])
+        # Réglage du nombre de voisins
+        k_neighbors = st.sidebar.slider("Number of Neighbors", min_value=1, max_value=20, value=3, step=1)
+        
+        return similarity_metric, k_neighbors
+    
     elif rec_type == "Content-Based":
         # Sélection des genres
         unique_genres = set('|'.join(movies_df['genres']).split('|'))  # Obtenir les genres uniques
@@ -184,8 +191,13 @@ rec_type = st.radio("", ["User-Based", "Content-Based"])
 # Si User-Based est sélectionné
 if rec_type == "User-Based":
     # Affichage de la sidebar pour les options
-    options = sidebar("User-Based")
+    similarity_metric, k_neighbors = sidebar("User-Based")
 
+    # Création de l'instance du Recommender en fonction des options sélectionnées
+    recommender = UserBasedRecommender(sim_options={'name': similarity_metric, 'user_based': True, 'min_support': 3}, k=k_neighbors, min_k=4)
+
+    # Entraîner le modèle avec les données initiales
+    recommender.fit(ratings_data)
     # Section pour l'insertion des films et des notes pour un nouvel utilisateur
     st.header("New User - Create a profile")
 
@@ -245,7 +257,8 @@ if rec_type == "User-Based":
                 st.header("Personalized recommendations")
                 for movie_id, rating in recommendations:
                     movie_title = get_movie_title_by_id(movie_id, movie_id_to_title)
-                    st.write(f"Recommended film : {movie_title}, Estimation : {rating:.2f}")
+                    if movie_title != "Titre non trouvé":  # Vérifier si le titre est trouvé
+                        st.write(f"Recommended film : {movie_title}, Estimation : {rating:.2f}")
             else:
                 st.warning("No recommendation for this user.")
         else:
