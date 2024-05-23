@@ -58,7 +58,6 @@ def sidebar(rec_type):
         selected_genres = st.sidebar.multiselect("Wished Genres", list(unique_genres))
         return selected_genres
 
-# Classe Recommender pour User-Based
 class UserBasedRecommender:
     def __init__(self, sim_options={}, k=3, min_k=4):
         self.sim_options = sim_options
@@ -85,6 +84,11 @@ class UserBasedRecommender:
 
     def get_user_recommendations(self, user_id, n=10):
         return self.recommend_items(user_id, n)
+    
+    def estimate(self, user_id, item_id):
+        # Utilisez l'algorithme KNN pour prédire la note de l'utilisateur pour l'élément spécifié
+        prediction = self.algorithm.predict(str(user_id), str(item_id))
+        return prediction.est
 
 
 
@@ -244,7 +248,7 @@ if st.button("Rec Sys Explanation", key= "Explanation button"):
 st.header("Choose one Recommender System")
 rec_type = st.radio("", ["User-Based", "Content-Based", "Latent Factor Model"])
 
-# Si User-Based est sélectionné
+            # Si User-Based est sélectionné
 if rec_type == "User-Based":
     # Affichage de la sidebar pour les options
     similarity_metric, k_neighbors = sidebar("User-Based")
@@ -308,11 +312,6 @@ if rec_type == "User-Based":
             combined_data = Dataset.load_from_df(combined_ratings[['userId', 'movieId', 'rating']], reader)
 
             # Réentraîner le modèle avec les nouvelles données
-            recommender = UserBasedRecommender(
-                sim_options={'name': similarity_metric, 'user_based': True, 'min_support': 3},
-                k=k_neighbors, 
-                min_k=2
-            )
             recommender.fit(combined_data)
 
             user_id = new_ratings_df['userId'].iloc[0]
@@ -323,12 +322,12 @@ if rec_type == "User-Based":
                 for movie_id, rating in recommendations:
                     movie_title = get_movie_title_by_id(movie_id, movie_id_to_title)
                     if movie_title != "Titre non trouvé":  # Vérifier si le titre est trouvé
-                        st.write(f"Recommended film : {movie_title}, Estimation : {rating:.2f}")
+                        estimated_rating = recommender.estimate(user_id, movie_id)
+                        st.write(f"Recommended film : {movie_title}, Estimation : {estimated_rating:.2f}")
             else:
                 st.warning("No recommendation for this user.")
         else:
             st.warning("Please add some ratings before getting recommendations.")
-
 
 # Si Content-Based est sélectionné
 elif rec_type == "Content-Based":
