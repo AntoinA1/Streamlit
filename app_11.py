@@ -138,12 +138,33 @@ class ContentBased:
             # Trier les films similaires par score de similarité (décroissant)
             movie_scores.sort(key=lambda x: x[1], reverse=True)
 
+            # Créer un dictionnaire pour regrouper les films ayant le même score de similarité
+            similar_score_groups = {}
+            for movie_id, similarity_score, movie_year in movie_scores:
+                if similarity_score not in similar_score_groups:
+                    similar_score_groups[similarity_score] = []
+                similar_score_groups[similarity_score].append((movie_id, similarity_score, movie_year))
+
+            # Parcourir les groupes de films ayant le même score de similarité et trier les années de publication
+            sorted_movie_scores = []
+            for similarity_score, movie_year_group in similar_score_groups.items():
+                # Séparer les films avec une année valide et ceux sans année
+                valid_year_group = [movie for movie in movie_year_group if movie[2] is not None]
+                invalid_year_group = [movie for movie in movie_year_group if movie[2] is None]
+                
+                # Trier les films avec une année valide par proximité de l'année de publication
+                valid_year_group.sort(key=lambda x: abs(x[2] - selected_movie_year))
+                
+                # Ajouter les films triés et non triés au résultat final
+                sorted_movie_scores.extend(valid_year_group)
+                sorted_movie_scores.extend(invalid_year_group)
+
             # Afficher le titre du film demandé
             st.write(f"Similar movies to '{selected_movie}' are :")
 
             # Afficher les films recommandés à l'utilisateur
             num_recommendations = 0
-            for movie_id, similarity_score, movie_year in movie_scores:
+            for movie_id, similarity_score, movie_year in sorted_movie_scores:
                 movie_title = self.movies_df.loc[movie_id, 'title']
                 if movie_year is not None:  # Vérifier si l'année de publication peut être extraite
                     st.write(f"{movie_title} (Similarité : {similarity_score:.2f}, Année de publication : {movie_year})")
@@ -154,6 +175,7 @@ class ContentBased:
                     break
         else:
             st.error("Veuillez sélectionner un film.")
+
 
 # Utiliser le dictionnaire pour obtenir le titre du film par son ID
 def get_movie_title_by_id(movie_id, movie_id_to_title):
