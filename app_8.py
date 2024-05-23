@@ -167,8 +167,16 @@ st.title("Recommender System, Group 6")
 explication = """
     \nWelcome to our movie recommendation application:
 
-    \n- User-based is ...
-    \n- Content-based is ...
+    \n- User-based recommends movies based on the similarity between users. In other words, it suggests movies to a user based on the preferences and ratings of other similar users.
+Start by adding movies and their ratings in the "New User - Create a profile" section. 
+Once you've added some ratings, you can press the "Get recommendations" button to receive personalized recommendations based on your preferences.
+The system will provide you with a list of recommended movies based on the ratings you provided.
+
+    \n- Content-based recommends movies based on the intrinsic characteristics of the movies themselves, such as their genres and release years.
+Start by entering the name of a movie you liked in the "Which film did you like?" section.
+Then, you can select specific genres (if you wish) in the sidebar to refine your recommendations.
+Press the "Get recommendations" button to receive a list of movies similar to the one you liked.
+
     \n- Feel free to try some options available on the sidebar :)
     """
 if st.button("Rec Sys Explanation", key= "Explanation button"):
