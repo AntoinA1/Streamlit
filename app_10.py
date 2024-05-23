@@ -85,14 +85,7 @@ class ContentBased:
         else:
             return None
     
-    def recommend_movies(self, movie_query, selected_genres):
-        # Recherche des films correspondant à la requête de l'utilisateur
-        movie_choices = self.movies_df['title'].tolist()
-        search_results = process.extract(movie_query, movie_choices, limit=5)
-        
-        # Afficher la liste déroulante pour sélectionner un film
-        selected_movie = st.selectbox("Sélectionnez un film :", [result[0] for result in search_results])
-
+    def recommend_movies(self, selected_movie, selected_genres):
         # Vérifier si un film a été sélectionné
         if selected_movie:
             # Trouver l'ID du film sélectionné (qui est l'index dans le DataFrame)
@@ -141,7 +134,6 @@ class ContentBased:
                     break
         else:
             st.error("Veuillez sélectionner un film.")
-
 
 # Utiliser le dictionnaire pour obtenir le titre du film par son ID
 def get_movie_title_by_id(movie_id, movie_id_to_title):
@@ -252,13 +244,15 @@ elif rec_type == "Content-Based":
     # Appeler la fonction sidebar pour obtenir les filtres de genre
     selected_genres = sidebar("Content-Based")
     
-    # Section pour entrer l'ID du film que l'utilisateur a aimé
+    # Section pour entrer le titre du film que l'utilisateur a aimé
     st.header("Which film did you like? :")
     recommender = ContentBased()
-    # Entrée du titre du film avec suggestions de films ressemblants à l'orthographe
+    
+    # Entrée du titre du film
     movie_query = st.text_input("Enter film:", key="movie_input")
+    
+    # Afficher les suggestions de films ressemblants à l'orthographe
     if movie_query:
-        # Proposer une liste de films ressemblant à l'orthographe dès que l'utilisateur commence à saisir le nom du film
         movie_choices = recommender.movies_df['title'].tolist()
         search_results = process.extract(movie_query, movie_choices, limit=5)
         selected_movie = st.selectbox("Select a film :", [result[0] for result in search_results], key="movie_selectbox")
@@ -267,4 +261,4 @@ elif rec_type == "Content-Based":
         if selected_movie:
             # Afficher les recommandations
             if st.button("Get recommendations"):
-                recommender.recommend_movies(movie_query=selected_movie, selected_genres=selected_genres)
+                recommender.recommend_movies(selected_movie, selected_genres)
