@@ -46,7 +46,7 @@ def sidebar(rec_type):
         # Options pour le User-Based Recommender
         st.sidebar.subheader("User-Based Options")
         # Choix de la métrique de similarité
-        similarity_metric = st.sidebar.selectbox("Similarity Metric", ["Cosine", "Pearson", "Msd", "Manhattan"])
+        similarity_metric = st.sidebar.selectbox("Similarity Metric", ["Cosine", "Pearson", "Msd"])
         # Réglage du nombre de voisins
         k_neighbors = st.sidebar.slider("Number of Neighbors", min_value=1, max_value=20, value=3, step=1)
         
@@ -174,9 +174,9 @@ class ContentBased:
             for movie_id, similarity_score, movie_year in sorted_movie_scores:
                 movie_title = self.movies_df.loc[movie_id, 'title']
                 if movie_year is not None:  # Vérifier si l'année de publication peut être extraite
-                    st.write(f"{movie_title} (Similarité : {similarity_score:.2f}, Année de publication : {movie_year})")
+                    st.write(f"{movie_title}")
                 else:
-                    st.write(f"{movie_title} (Similarité : {similarity_score:.2f})")
+                    st.write(f"{movie_title}")
                 num_recommendations += 1
                 if num_recommendations >= 20:
                     break
@@ -238,6 +238,9 @@ The system will provide you with a list of recommended movies based on the ratin
 Start by entering the name of a movie you liked in the "Which film did you like?" section.
 Then, you can select specific genres (if you wish) in the sidebar to refine your recommendations.
 Press the "Get recommendations" button to receive a list of movies similar to the one you liked.
+
+    \n- Latent Factor Model is based on factors that are derived from the datas. It recommends movies based on underlying patterns in the user-item interaction matrix, captured through latent factors.
+These recommendations are based on similarities in how movies are rated across different latent factors, allowing the system to predict which movies the user might enjoy based on existing ratings.
 
     \n- Feel free to try some options available on the sidebar :)
     """
@@ -323,7 +326,7 @@ if rec_type == "User-Based":
                     movie_title = get_movie_title_by_id(movie_id, movie_id_to_title)
                     if movie_title != "Titre non trouvé":  # Vérifier si le titre est trouvé
                         estimated_rating = recommender.estimate(user_id, movie_id)
-                        st.write(f"Recommended film : {movie_title}, Estimation : {estimated_rating:.2f}")
+                        st.write(f"Recommended film : {movie_title}")
             else:
                 st.warning("No recommendation for this user.")
         else:
@@ -392,6 +395,6 @@ elif rec_type == "Latent Factor Model":
             st.header(f"Top recommendations for User {user_id}:")
             for movie_id, rating in user_recommendations[user_id][:10]:
                 movie_title = get_movie_title_by_id(movie_id, movie_id_to_title)
-                st.write(f"- {movie_title} (Estimated Rating: {rating:.2f})")
+                st.write(f"- {movie_title}")
         else:
             st.warning("No recommendations available for this user.")
