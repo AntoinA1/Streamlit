@@ -46,7 +46,7 @@ def sidebar(rec_type):
         # Options pour le User-Based Recommender
         st.sidebar.subheader("User-Based Options")
         # Choix de la métrique de similarité
-        similarity_metric = st.sidebar.selectbox("Similarity Metric", ["Cosine", "Pearson", "Msd", "Manhattan"])
+        similarity_metric = st.sidebar.selectbox("Similarity Metric", ["Cosine", "Pearson", "Msd"])
         # Réglage du nombre de voisins
         k_neighbors = st.sidebar.slider("Number of Neighbors", min_value=1, max_value=20, value=3, step=1)
         
@@ -67,18 +67,9 @@ class UserBasedRecommender:
 
     def fit(self, data):
         train_set, _ = train_test_split(data, test_size=0.25)
-        if self.sim_options.get('name') == 'manhattan':
-            # Utiliser la similarité de Manhattan si elle est sélectionnée
-            self.algorithm = KNNWithMeans(sim_options={'name': 'manhattan', 'user_based': True}, k=self.k, min_k=self.min_k)
-        else:
-            # Utiliser la similarité spécifiée par l'utilisateur
-            self.algorithm = KNNWithMeans(sim_options=self.sim_options, k=self.k, min_k=self.min_k)
+        # Utiliser la similarité spécifiée par l'utilisateur
+        self.algorithm = KNNWithMeans(sim_options=self.sim_options, k=self.k, min_k=self.min_k)
         self.algorithm.fit(train_set)
-
-    def manhattan_similarity(self, u, v):
-        u_ratings = np.array([rating for (_, rating) in self.algorithm.trainset.ur[u]])
-        v_ratings = np.array([rating for (_, rating) in self.algorithm.trainset.ur[v]])
-        return 1 / (1 + manhattan_distances([u_ratings], [v_ratings])[0][0])
 
     def recommend_items(self, user_id, n=5):
         anti_test_set = self.algorithm.trainset.build_anti_testset()
@@ -91,6 +82,62 @@ class UserBasedRecommender:
             return user_recommendations[user_id][:n]
         else:
             return []
+
+    def get_user_recommendations(self, user_id, n=10):
+        return self.recommend_items(user_id, n)
+    
+
+class CustomUserBasedRecommender:
+    def __init__(self, k=3):
+        self.k = k
+        self.train_set = None
+        self.similarity_matrix = None
+
+    def fit(self, data):
+        train_set, _ = train_test_split(data, test_size=0.25)
+        
+        self.compute_similarity_matrix()
+
+    def compute_similarity_matrix(self):
+        num_users = self.train_set.n_users
+        self.similarity_matrix = np.zeros((num_users, num_users))
+        for i, u in enumerate(self.train_set.all_users()):
+            for j, v in enumerate(self.train_set.all_users()):
+                if i != j:
+                    similarity = self.manhattan_similarity(u, v)
+                    self.similarity_matrix[i, j] = similarity
+
+    def manhattan_similarity(self, u, v):
+        u_ratings = [self.train_set.ur[u].get(i, 0.0) for i in range(self.train_set.n_items)]
+        v_ratings = [self.train_set.ur[v].get(i, 0.0) for i in range(self.train_set.n_items)]
+        return 1 / (1 + manhattan_distances([u_ratings], [v_ratings])[0][0])
+
+    def recommend_items(self, user_id, n=5):
+        user_ratings = self.train_set.ur[user_id]
+        # Trouver les utilisateurs les plus similaires à l'utilisateur donné
+        similar_users = self.find_similar_users(user_id)
+        # Créer un dictionnaire pour stocker les scores cumulés des éléments recommandés
+        recommended_items_scores = defaultdict(float)
+        # Parcourir les utilisateurs similaires
+        for similar_user_id, similarity_score in similar_users:
+            similar_user_ratings = self.train_set.ur[similar_user_id]
+            # Parcourir les éléments évalués par l'utilisateur similaire
+            for item_id, rating in similar_user_ratings.items():
+                # Ne recommander que les éléments que l'utilisateur donné n'a pas évalués
+                if item_id not in user_ratings:
+                    # Ajouter le score du film recommandé en utilisant la note du film et la similarité avec l'utilisateur similaire
+                    recommended_items_scores[item_id] += rating * similarity_score
+        # Trier les éléments recommandés par score décroissant
+        recommended_items_sorted = sorted(recommended_items_scores.items(), key=lambda x: x[1], reverse=True)
+        # Renvoyer les n premiers éléments recommandés
+        return recommended_items_sorted[:n]
+
+    def find_similar_users(self, user_id):
+        # Renvoie les k utilisateurs les plus similaires à l'utilisateur donné
+        user_similarity_row = self.similarity_matrix[user_id]
+        similar_users = [(idx, score) for idx, score in enumerate(user_similarity_row) if idx != user_id]
+        similar_users.sort(key=lambda x: x[1], reverse=True)
+        return similar_users
 
     def get_user_recommendations(self, user_id, n=10):
         return self.recommend_items(user_id, n)
@@ -242,9 +289,12 @@ Start by entering the name of a movie you liked in the "Which film did you like?
 Then, you can select specific genres (if you wish) in the sidebar to refine your recommendations.
 Press the "Get recommendations" button to receive a list of movies similar to the one you liked.
 
+    \n- Latent Factor Model is based on factors that are derived from the datas. It recommends movies based on underlying patterns in the user-item interaction matrix, captured through latent factors.
+These recommendations are based on similarities in how movies are rated across different latent factors, allowing the system to predict which movies the user might enjoy based on existing ratings.
+
     \n- Feel free to try some options available on the sidebar :)
     """
-if st.button("Rec Sys Explanation", key= "Explanation button"):
+if st.button("How are the recommendations calculated ?", key= "Explanation button"):
     st.write(explication)
 
 # Section pour choisir le type de système de recommandation
@@ -260,12 +310,15 @@ if rec_type == "User-Based":
     if 'new_ratings' not in st.session_state:
         st.session_state['new_ratings'] = []
 
-    # Création de l'instance du Recommender en fonction des options sélectionnées
-    recommender = UserBasedRecommender(
-        sim_options={'name': similarity_metric, 'user_based': True, 'min_support': 3},
-        k=k_neighbors, 
-        min_k=2
-    )
+    if similarity_metric == 'Manhattan':
+        recommender = CustomUserBasedRecommender()
+    else:
+        # Création de l'instance du Recommender en fonction des options sélectionnées
+        recommender = UserBasedRecommender(
+            sim_options={'name': similarity_metric, 'user_based': True, 'min_support': 3},
+            k=k_neighbors, 
+            min_k=2
+        )
 
     # Entraîner le modèle avec les données initiales
     recommender.fit(ratings_data)
@@ -326,7 +379,7 @@ if rec_type == "User-Based":
                     movie_title = get_movie_title_by_id(movie_id, movie_id_to_title)
                     if movie_title != "Titre non trouvé":  # Vérifier si le titre est trouvé
                         estimated_rating = recommender.estimate(user_id, movie_id)
-                        st.write(f"Recommended film : {movie_title}, Estimation : {estimated_rating:.2f}")
+                        st.write(f"Recommended film : {movie_title}")
             else:
                 st.warning("No recommendation for this user.")
         else:
@@ -395,6 +448,6 @@ elif rec_type == "Latent Factor Model":
             st.header(f"Top recommendations for User {user_id}:")
             for movie_id, rating in user_recommendations[user_id][:10]:
                 movie_title = get_movie_title_by_id(movie_id, movie_id_to_title)
-                st.write(f"- {movie_title} (Estimated Rating: {rating:.2f})")
+                st.write(f"- {movie_title}")
         else:
             st.warning("No recommendations available for this user.")
